@@ -188,28 +188,48 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
     }
 
     private fun startVoiceListeningForCall() {
-        startSpeechRecognition { command ->
-            processCallCommand(command)
+        startSpeechRecognition { candidates ->
+            processCallCommand(candidates)
         }
     }
 
     private fun startVoiceListeningForReply() {
-        startSpeechRecognition { command ->
-            when {
-                command.startsWith("reply ") || command.startsWith("send ") -> {
-                    val replyText = command.substringAfter(" ").trim()
-                    sendWhatsAppReply(replyText)
-                }
-                command.contains("read summary") -> {
-                    readNotificationSummary()
-                }
-                command.startsWith("note ") -> {
-                    saveVoiceNote(command.removePrefix("note ").trim())
-                }
-                command.contains("help sos") -> {
-                    sensorSafetyManager.triggerEmergencySos("Voice Help SOS")
-                }
+        startSpeechRecognition { candidates ->
+            processReplyCommand(candidates)
+        }
+    }
+
+    private fun processReplyCommand(commands: List<String>) {
+        // 1. WhatsApp Voice Reply (English + Hindi: reply, bhejo, jawab do, भेजो, जवाब दो)
+        for (cmd in commands) {
+            val prefixes = listOf("reply ", "send ", "bhejo ", "jawab do ", "bolo ", "भेजो ", "जवाब दो ", "बोलो ")
+            val matched = prefixes.firstOrNull { cmd.startsWith(it) }
+            if (matched != null) {
+                val replyText = cmd.substringAfter(matched).trim()
+                sendWhatsAppReply(replyText)
+                return
             }
+        }
+
+        // 2. Read Summary (English + Hindi: summary, समरी, message padho, मैसेज पढ़ो)
+        if (commands.any { it.contains("summary") || it.contains("समरी") || it.contains("message") || it.contains("मैसेज") }) {
+            readNotificationSummary()
+            return
+        }
+
+        // 3. Voice Note (English + Hindi: note, likho, नोट, लिखो)
+        for (cmd in commands) {
+            val prefixes = listOf("note ", "likho ", "नोट ", "लिखो ")
+            val matched = prefixes.firstOrNull { cmd.startsWith(it) }
+            if (matched != null) {
+                saveVoiceNote(cmd.substringAfter(matched).trim())
+                return
+            }
+        }
+
+        // 4. Emergency SOS (Help, Madad, Bachao, मदद, बचाओ)
+        if (commands.any { it.contains("help") || it.contains("sos") || it.contains("madad") || it.contains("मदद") || it.contains("बचाओ") }) {
+            sensorSafetyManager.triggerEmergencySos("Voice Help SOS")
         }
     }
 
@@ -223,24 +243,55 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             bundle.putCharSequence(remoteInput.resultKey, replyText)
             RemoteInput.addResultsToIntent(arrayOf(remoteInput), intent, bundle)
             action.actionIntent.send(this, 0, intent)
-            textToSpeech?.speak("Reply sent", TextToSpeech.QUEUE_ADD, null, null)
+            textToSpeech?.speak("Reply sent: $replyText", TextToSpeech.QUEUE_ADD, null, null)
         } catch (e: Exception) {
             Log.e(TAG, "Reply error: ${e.message}")
         }
     }
 
-    private fun processCallCommand(command: String) {
+    private fun processCallCommand(commands: List<String>) {
         val sbn = activeCallNotification ?: return
         val actions = sbn.notification.actions ?: return
 
+        // Pick up Call (English: pick up, answer | Hindi/Hinglish: uthao, utha, उठाओ, उठा लो, फोन उठाओ)
+        val isAnswer = commands.any { cmd ->
+            cmd.contains("pick up") || cmd.contains("answer") || cmd.contains("accept") ||
+            cmd.contains("utha") || cmd.contains("uthhao") || cmd.contains("uthao") ||
+            cmd.contains("utha lo") || cmd.contains("phone uthao") || cmd.contains("call uthao") ||
+            cmd.contains("उठाओ") || cmd.contains("उठा") || cmd.contains("फोन उठाओ") ||
+            cmd.contains("कॉल उठाओ") || cmd.contains("हां") || cmd.contains("उठा लो")
+        }
+
+        // Cut / Decline Call (English: cut, reject | Hindi/Hinglish: kato, kaat do, काटो, काट, फोन काटो)
+        val isDecline = commands.any { cmd ->
+            cmd.contains("cut") || cmd.contains("reject") || cmd.contains("decline") ||
+            cmd.contains("kato") || cmd.contains("kaat") || cmd.contains("kat do") ||
+            cmd.contains("kaat do") || cmd.contains("phone kato") || cmd.contains("call kato") ||
+            cmd.contains("काटो") || cmd.contains("काट") || cmd.contains("काट दो") ||
+            cmd.contains("फोन काटो") || cmd.contains("कॉल काटो") || cmd.contains("नहीं")
+        }
+
+        // Pixel-Style Call Screening (English: screen | Hindi/Hinglish: poocho, pucho, पूछो, स्क्रीन)
+        val isScreen = commands.any { cmd ->
+            cmd.contains("screen") || cmd.contains("screen call") || cmd.contains("poocho") ||
+            cmd.contains("pucho") || cmd.contains("स्क्रीन") || cmd.contains("पूछो") ||
+            cmd.contains("स्क्रीन करो") || cmd.contains("पता करो")
+        }
+
+        // SOS (Help, Madad, Bachao, मदद, बचाओ)
+        val isSos = commands.any { cmd ->
+            cmd.contains("help") || cmd.contains("sos") || cmd.contains("madad") ||
+            cmd.contains("bachao") || cmd.contains("मदद") || cmd.contains("बचाओ")
+        }
+
         when {
-            command.contains("pick up") || command.contains("answer") || command.contains("accept") -> {
+            isAnswer -> {
                 val answerAction = actions.firstOrNull {
                     it.title.toString().contains("answer", true) || it.title.toString().contains("accept", true)
                 }
                 try { answerAction?.actionIntent?.send() } catch (_: Exception) {}
             }
-            command.contains("cut") || command.contains("reject") || command.contains("decline") -> {
+            isDecline -> {
                 val declineAction = actions.firstOrNull {
                     it.title.toString().contains("decline", true) || it.title.toString().contains("reject", true)
                 }
@@ -251,15 +302,14 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                 }
                 resumeYouTubePlayback()
             }
-            // Pixel-Style "Call Screening" (AI Secretary)
-            command.contains("screen") || command.contains("screen call") -> {
+            isScreen -> {
                 textToSpeech?.speak(
-                    "Hi, the owner is currently busy. Please state your name and purpose of call.",
-                    TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL"
+                    "नमस्ते, फ़ोन के मालिक अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
+                    TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL_HI"
                 )
             }
-            command.contains("help sos") -> {
-                sensorSafetyManager.triggerEmergencySos("Voice Help SOS")
+            isSos -> {
+                sensorSafetyManager.triggerEmergencySos("Hindi Voice Help SOS")
             }
         }
     }
@@ -276,7 +326,7 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                 else if (!n.packageName.contains("android") && !n.isOngoing) otherCount++
             }
 
-            val summary = "You have $waCount unread WhatsApp messages and $otherCount other app notifications."
+            val summary = "आपके पास $waCount नए व्हाट्सएप मैसेज और $otherCount अन्य नोटिफिकेशन्स हैं।"
             textToSpeech?.speak(summary, TextToSpeech.QUEUE_FLUSH, null, "NOTIF_SUMMARY")
         } catch (e: Exception) {
             Log.e(TAG, "Summary error: ${e.message}")
@@ -289,21 +339,21 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         val newNotes = "$existingNotes\n• $noteText (${System.currentTimeMillis()})"
         notesPrefs.edit().putString("notes_list", newNotes).apply()
 
-        textToSpeech?.speak("Note saved: $noteText", TextToSpeech.QUEUE_ADD, null, "NOTE_SAVED")
+        textToSpeech?.speak("नोट सेव हो गया: $noteText", TextToSpeech.QUEUE_ADD, null, "NOTE_SAVED")
         Log.d(TAG, "Voice note saved: $noteText")
     }
 
     private fun sendAutoSms(phoneNumber: String) {
         try {
             val smsManager = SmsManager.getDefault()
-            val message = "I am riding/busy right now, will call you back shortly."
+            val message = "I am riding/busy right now, will call you back shortly. (व्यस्त हूँ, बाद में कॉल करता हूँ)"
             smsManager.sendTextMessage(phoneNumber, null, message, null, null)
         } catch (e: Exception) {
             Log.e(TAG, "Auto-SMS error: ${e.message}")
         }
     }
 
-    private fun startSpeechRecognition(onResult: (String) -> Unit) {
+    private fun startSpeechRecognition(onResult: (List<String>) -> Unit) {
         if (isListeningForVoice) return
         isListeningForVoice = true
 
@@ -313,12 +363,17 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             }
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-IN", "hi-IN", "en-US"))
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             }
             speechRecognizer?.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) {
-                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.lowercase() ?: ""
+                    val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
+                    val lowerList = list.map { it.lowercase() }
                     isListeningForVoice = false
-                    onResult(text)
+                    onResult(lowerList)
                 }
                 override fun onError(error: Int) { isListeningForVoice = false }
                 override fun onReadyForSpeech(params: Bundle?) {}
