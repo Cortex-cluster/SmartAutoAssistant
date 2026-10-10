@@ -14,7 +14,6 @@ An intelligent, hands-free Android background assistant designed for seamless Yo
 ### 2. 🏍️ Riding, Travel & Safety Superpowers
 * **📢 Speed-Adaptive Volume:** Automatically boosts earphone volume when riding fast (>25 km/h) against wind noise, and lowers it when stopped at traffic lights.
 * **🚨 Anti-Theft Earbud Alarm:** If your phone is locked and someone pulls out your earbuds, the phone immediately sounds a loud security alarm.
-* **🆘 Emergency Voice & Shake SOS:** Speak *"Help SOS"* or violently shake the phone 5 times to send an emergency SMS with live Google Maps GPS coordinates.
 * **🔄 Flip-to-Mute:** Silence any ringing call instantly by simply flipping your phone face-down on the table.
 
 ### 3. 🤖 AI Secretary & Voice Engine

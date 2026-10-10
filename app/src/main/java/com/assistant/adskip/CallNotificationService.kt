@@ -258,11 +258,6 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                 return
             }
         }
-
-        // 4. Emergency SOS (Help, Madad, Bachao, मदद, बचाओ)
-        if (commands.any { it.contains("help") || it.contains("sos") || it.contains("madad") || it.contains("मदद") || it.contains("बचाओ") }) {
-            sensorSafetyManager.triggerEmergencySos("Voice Help SOS")
-        }
     }
 
     private fun sendWhatsAppReply(replyText: String) {
@@ -312,12 +307,6 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             cmd.contains("स्क्रीन करो") || cmd.contains("पता करो")
         }
 
-        // SOS (Help, Madad, Bachao, मदद, बचाओ)
-        val isSos = commands.any { cmd ->
-            cmd.contains("help") || cmd.contains("sos") || cmd.contains("madad") ||
-            cmd.contains("bachao") || cmd.contains("मदद") || cmd.contains("बचाओ")
-        }
-
         when {
             isAnswer -> {
                 answerCall(actions)
@@ -330,9 +319,6 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                     "नमस्ते, फ़ोन के मालिक अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
                     TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL_HI"
                 )
-            }
-            isSos -> {
-                sensorSafetyManager.triggerEmergencySos("Hindi Voice Help SOS")
             }
         }
     }
