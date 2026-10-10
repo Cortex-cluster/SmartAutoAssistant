@@ -316,7 +316,7 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             }
             isScreen -> {
                 textToSpeech?.speak(
-                    "नमस्ते, फ़ोन के मालिक अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
+                    "नमस्ते, पवन अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
                     TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL_HI"
                 )
             }
@@ -427,7 +427,7 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
     private fun sendAutoSms(phoneNumber: String) {
         try {
             val smsManager = SmsManager.getDefault()
-            val message = "I am riding/busy right now, will call you back shortly. (व्यस्त हूँ, बाद में कॉल करता हूँ)"
+            val message = "Pawan is busy right now, will call you back shortly. (पवन अभी व्यस्त हैं, बाद में कॉल करेंगे)"
             smsManager.sendTextMessage(phoneNumber, null, message, null, null)
         } catch (e: Exception) {
             Log.e(TAG, "Auto-SMS error: ${e.message}")
