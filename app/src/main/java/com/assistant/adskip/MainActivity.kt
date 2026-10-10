@@ -48,6 +48,8 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.BLUETOOTH,
             Manifest.permission.MODIFY_AUDIO_SETTINGS,
             Manifest.permission.SEND_SMS,
+            Manifest.permission.ANSWER_PHONE_CALLS,
+            Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         )

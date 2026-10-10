@@ -22,6 +22,9 @@ import android.speech.tts.TextToSpeech
 import android.telephony.SmsManager
 import android.util.Log
 import android.view.KeyEvent
+import android.os.Build
+import android.telecom.TelecomManager
+import android.view.accessibility.AccessibilityNodeInfo
 import java.util.Locale
 
 class CallNotificationService : NotificationListenerService(), TextToSpeech.OnInitListener {
@@ -250,8 +253,8 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
     }
 
     private fun processCallCommand(commands: List<String>) {
-        val sbn = activeCallNotification ?: return
-        val actions = sbn.notification.actions ?: return
+        val sbn = activeCallNotification
+        val actions = sbn?.notification?.actions
 
         // Pick up Call (English: pick up, answer | Hindi/Hinglish: uthao, utha, उठाओ, उठा लो, फोन उठाओ)
         val isAnswer = commands.any { cmd ->
@@ -259,7 +262,8 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             cmd.contains("utha") || cmd.contains("uthhao") || cmd.contains("uthao") ||
             cmd.contains("utha lo") || cmd.contains("phone uthao") || cmd.contains("call uthao") ||
             cmd.contains("उठाओ") || cmd.contains("उठा") || cmd.contains("फोन उठाओ") ||
-            cmd.contains("कॉल उठाओ") || cmd.contains("हां") || cmd.contains("उठा लो")
+            cmd.contains("कॉल उठाओ") || cmd.contains("हां") || cmd.contains("उठा लो") ||
+            cmd.contains("yes") || cmd.contains("haan")
         }
 
         // Cut / Decline Call (English: cut, reject | Hindi/Hinglish: kato, kaat do, काटो, काट, फोन काटो)
@@ -268,7 +272,8 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             cmd.contains("kato") || cmd.contains("kaat") || cmd.contains("kat do") ||
             cmd.contains("kaat do") || cmd.contains("phone kato") || cmd.contains("call kato") ||
             cmd.contains("काटो") || cmd.contains("काट") || cmd.contains("काट दो") ||
-            cmd.contains("फोन काटो") || cmd.contains("कॉल काटो") || cmd.contains("नहीं")
+            cmd.contains("फोन काटो") || cmd.contains("कॉल काटो") || cmd.contains("नहीं") ||
+            cmd.contains("drop") || cmd.contains("no")
         }
 
         // Pixel-Style Call Screening (English: screen | Hindi/Hinglish: poocho, pucho, पूछो, स्क्रीन)
@@ -286,21 +291,10 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
 
         when {
             isAnswer -> {
-                val answerAction = actions.firstOrNull {
-                    it.title.toString().contains("answer", true) || it.title.toString().contains("accept", true)
-                }
-                try { answerAction?.actionIntent?.send() } catch (_: Exception) {}
+                answerCall(actions)
             }
             isDecline -> {
-                val declineAction = actions.firstOrNull {
-                    it.title.toString().contains("decline", true) || it.title.toString().contains("reject", true)
-                }
-                try { declineAction?.actionIntent?.send() } catch (_: Exception) {}
-
-                activeCallerNumber?.let { number ->
-                    sendAutoSms(number)
-                }
-                resumeYouTubePlayback()
+                declineCall(actions)
             }
             isScreen -> {
                 textToSpeech?.speak(
@@ -312,6 +306,78 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                 sensorSafetyManager.triggerEmergencySos("Hindi Voice Help SOS")
             }
         }
+    }
+
+    private fun answerCall(actions: Array<Notification.Action>?) {
+        Log.d(TAG, "Executing call answer across all layers...")
+
+        // 1. Android TelecomManager (Official OS Call Answering API)
+        try {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                telecomManager?.acceptRingingCall()
+                Log.d(TAG, "Called telecomManager.acceptRingingCall()")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "TelecomManager answer error: ${e.message}")
+        }
+
+        // 2. HeadsetHook Key Event (Universal Bluetooth earphone answer hardware trigger)
+        try {
+            audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_HEADSETHOOK))
+            audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_HEADSETHOOK))
+            Log.d(TAG, "Dispatched KEYCODE_HEADSETHOOK for answering call.")
+        } catch (e: Exception) {
+            Log.w(TAG, "HeadsetHook answer error: ${e.message}")
+        }
+
+        // 3. Notification Action Intent (WhatsApp, Instagram, Telegram VoIP calls)
+        val answerAction = actions?.firstOrNull {
+            it.title.toString().contains("answer", true) ||
+            it.title.toString().contains("accept", true) ||
+            it.title.toString().contains("उठा", true)
+        }
+        try {
+            answerAction?.actionIntent?.send()
+            Log.d(TAG, "Triggered answer PendingIntent.")
+        } catch (e: Exception) {
+            Log.w(TAG, "PendingIntent answer error: ${e.message}")
+        }
+    }
+
+    private fun declineCall(actions: Array<Notification.Action>?) {
+        Log.d(TAG, "Executing call decline across all layers...")
+
+        // 1. Android TelecomManager (Official OS Call Rejection API)
+        try {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                telecomManager?.endCall()
+                Log.d(TAG, "Called telecomManager.endCall()")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "TelecomManager endCall error: ${e.message}")
+        }
+
+        // 2. Notification Action Intent (WhatsApp, Instagram, Phone dialer)
+        val declineAction = actions?.firstOrNull {
+            it.title.toString().contains("decline", true) ||
+            it.title.toString().contains("reject", true) ||
+            it.title.toString().contains("dismiss", true) ||
+            it.title.toString().contains("काट", true)
+        }
+        try {
+            declineAction?.actionIntent?.send()
+            Log.d(TAG, "Triggered decline PendingIntent.")
+        } catch (e: Exception) {
+            Log.w(TAG, "PendingIntent decline error: ${e.message}")
+        }
+
+        // 3. Auto-SMS on Decline
+        activeCallerNumber?.let { number ->
+            sendAutoSms(number)
+        }
+        resumeYouTubePlayback()
     }
 
     // "Read My Notifications" Voice Summary
