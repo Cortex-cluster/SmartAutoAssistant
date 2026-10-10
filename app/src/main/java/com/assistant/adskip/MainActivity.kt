@@ -43,9 +43,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndRequestPermissions() {
-        val permissions = arrayOf(
+        val permissionList = mutableListOf(
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.BLUETOOTH,
             Manifest.permission.MODIFY_AUDIO_SETTINGS,
             Manifest.permission.SEND_SMS,
             Manifest.permission.ANSWER_PHONE_CALLS,
@@ -54,7 +53,11 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         )
 
-        val missingPermissions = permissions.filter {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            permissionList.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+
+        val missingPermissions = permissionList.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 

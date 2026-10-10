@@ -151,21 +151,24 @@ class SensorSafetyManager(
 
     // 4. Anti-Theft Alarm on Earbud Disconnect when Screen Locked
     fun triggerAntiTheftAlarmIfLocked() {
-        if (keyguardManager.isKeyguardLocked) {
-            Log.w(TAG, "Anti-theft: Earbuds pulled while phone was locked! Sounding ALARM!")
-            tts?.speak("Warning! Earphones disconnected while phone is locked!", TextToSpeech.QUEUE_FLUSH, null, null)
+        try {
+            if (keyguardManager.isKeyguardLocked) {
+                Log.w(TAG, "Anti-theft: Earbuds pulled while phone was locked! Sounding ALARM!")
+                tts?.speak("Warning! Earphones disconnected while phone is locked!", TextToSpeech.QUEUE_FLUSH, null, null)
 
-            // Play loud alarm
-            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
-            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            val ringtone = RingtoneManager.getRingtone(context, alarmUri)
-            ringtone.play()
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                val ringtone = RingtoneManager.getRingtone(context, alarmUri)
+                ringtone?.play()
 
-            Handler(Looper.getMainLooper()).postDelayed({
-                ringtone.stop()
-            }, 8000)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try { ringtone?.stop() } catch (_: Exception) {}
+                }, 8000)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in anti-theft alarm: ${e.message}")
         }
     }
 

@@ -89,7 +89,11 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
     }
 
     private fun isBluetoothConnected(): Boolean {
-        return audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+        return try {
+            audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn || audioManager.isWiredHeadsetOn
+        } catch (_: Exception) {
+            true
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
