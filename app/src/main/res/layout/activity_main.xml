@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal"
+    android:background="#121212">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Smart Auto Assistant"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="YouTube Fast-Skip + Bluetooth Call Assistant"
+        android:textSize="14sp"
+        android:textColor="#00E676"
+        android:layout_marginBottom="32dp" />
+
+    <Button
+        android:id="@+id/btnAccessibility"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="1. Enable YouTube Fast-Skip &amp; Mute"
+        android:backgroundTint="#2979FF"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnNotification"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="2. Enable WhatsApp / Call Detection"
+        android:backgroundTint="#00C853"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnMicPermission"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="3. Enable Voice Responder (Mic)"
+        android:backgroundTint="#FF6D00"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Features Active in Background:\n• Auto-Skip &amp; Mute YouTube Ads\n• 16x Fast-Forward Ad Player\n• Bluetooth Caller ID Announcement\n• Voice 'Pick up' / 'Cut it' support\n• Auto-resume YouTube when call ends"
+        android:textSize="13sp"
+        android:textColor="#B0BEC5"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginTop="24dp" />
+
+</LinearLayout>

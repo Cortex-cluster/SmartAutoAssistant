@@ -1,0 +1,61 @@
+package com.assistant.adskip
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.provider.Settings
+import android.widget.Button
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+
+class MainActivity : AppCompatActivity() {
+
+    private val PERMISSION_REQUEST_CODE = 101
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val btnAccessibility = findViewById<Button>(R.id.btnAccessibility)
+        val btnNotification = findViewById<Button>(R.id.btnNotification)
+        val btnMicPermission = findViewById<Button>(R.id.btnMicPermission)
+
+        btnAccessibility.setOnClickListener {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+            Toast.makeText(this, "Turn ON 'Smart Auto Assistant'", Toast.LENGTH_LONG).show()
+        }
+
+        btnNotification.setOnClickListener {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            startActivity(intent)
+            Toast.makeText(this, "Allow Notification Access for 'Smart Auto Assistant'", Toast.LENGTH_LONG).show()
+        }
+
+        btnMicPermission.setOnClickListener {
+            checkAndRequestPermissions()
+        }
+
+        checkAndRequestPermissions()
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS,
+            Manifest.permission.SEND_SMS
+        )
+
+        val missingPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
+        }
+    }
+}

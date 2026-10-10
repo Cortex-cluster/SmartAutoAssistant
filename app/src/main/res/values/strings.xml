@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Smart Auto Assistant</string>
+    <string name="accessibility_service_desc">Automatically mutes, fast-forwards, and skips YouTube ads, and assists with call handling.</string>
+</resources>
