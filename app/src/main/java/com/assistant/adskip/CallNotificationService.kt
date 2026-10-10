@@ -79,10 +79,12 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         if (status == TextToSpeech.SUCCESS) {
             textToSpeech?.language = Locale.getDefault()
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build()
             textToSpeech?.setAudioAttributes(audioAttributes)
+            textToSpeech?.setSpeechRate(0.95f)
+            textToSpeech?.setPitch(1.0f)
         }
     }
 
@@ -167,6 +169,24 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         }, 3500)
     }
 
+    private fun formatCallerForSpeech(raw: String): String {
+        val clean = raw.trim()
+        val digitsOnly = clean.replace(Regex("[^0-9]"), "")
+
+        // If it's a saved contact name (contains letters)
+        if (clean.any { it.isLetter() }) {
+            return clean
+        }
+
+        // If it's a 10+ digit phone number, read in friendly 5-digit chunks: "98765 43210"
+        val tenDigits = if (digitsOnly.length > 10) digitsOnly.takeLast(10) else digitsOnly
+        if (tenDigits.length == 10) {
+            return "${tenDigits.substring(0, 5)}, ${tenDigits.substring(5)}"
+        }
+
+        return clean
+    }
+
     private fun handleIncomingCall(packageName: String, callerTitle: String, callerText: String) {
         if (!isBluetoothConnected()) return
 
@@ -178,13 +198,18 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         }
 
         val callerIdentity = if (callerTitle.isNotBlank()) callerTitle else callerText
-        val announcement = if (callerIdentity.matches(Regex("^[+0-9\\s-]+$"))) {
-            "$appName call from number ${callerIdentity.replace("", " ").trim()}"
+        val naturalCaller = formatCallerForSpeech(callerIdentity)
+
+        val announcement = if (callerIdentity.any { it.isLetter() }) {
+            "$appName call from $naturalCaller"
         } else {
-            "$appName call from $callerIdentity"
+            "Incoming call from $naturalCaller"
         }
 
-        textToSpeech?.speak(announcement, TextToSpeech.QUEUE_FLUSH, null, "CALL_ANNOUNCE")
+        val params = Bundle().apply {
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f) // Comfortable earphone volume
+        }
+        textToSpeech?.speak(announcement, TextToSpeech.QUEUE_FLUSH, params, "CALL_ANNOUNCE")
         mainHandler.postDelayed({
             startVoiceListeningForCall()
         }, 3000)

@@ -139,25 +139,10 @@ class SensorSafetyManager(
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    // 3. Speed-Adaptive Volume
+    // 3. Speed Tracking (Logged safely without forcing harsh earphone volumes)
     override fun onLocationChanged(location: Location) {
-        val speedKmh = location.speed * 3.6f // Convert m/s to km/h
-
-        if (speedKmh > 25.0f && lastSpeedCategory != 1) {
-            // Riding fast: boost volume against wind noise
-            lastSpeedCategory = 1
-            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val highVol = (maxVol * 0.85).toInt()
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, highVol, 0)
-            Log.d(TAG, "Riding fast ($speedKmh km/h): Volume boosted.")
-        } else if (speedKmh < 7.0f && lastSpeedCategory != 0) {
-            // Stopped at traffic light: lower volume
-            lastSpeedCategory = 0
-            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val normalVol = (maxVol * 0.55).toInt()
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, normalVol, 0)
-            Log.d(TAG, "Stopped at signal ($speedKmh km/h): Volume lowered.")
-        }
+        val speedKmh = location.speed * 3.6f
+        Log.d(TAG, "Current speed: $speedKmh km/h")
     }
 
     override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
