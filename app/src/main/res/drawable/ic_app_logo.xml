@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dark Tech Circular Background -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M54,4 C26.386,4 4,26.386 4,54 C4,81.614 26.386,104 54,104 C81.614,104 104,81.614 104,54 C104,26.386 81.614,4 54,4 Z" />
+
+    <!-- Neon Cyan Shield Outline -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#162235"
+        android:pathData="M54,20 L80,30 C80,58 68,76 54,86 C40,76 28,58 28,30 Z" />
+
+    <!-- Electric Lightning Bolt & Sound Pulse -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M56,32 L40,54 L52,54 L48,74 L68,50 L56,50 Z" />
+
+    <!-- Audio Wave Accent Dots -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M20,54 A3,3 0 1,1 20,53.99 Z M88,54 A3,3 0 1,1 88,53.99 Z M54,12 A3,3 0 1,1 54,11.99 Z M54,96 A3,3 0 1,1 54,95.99 Z" />
+</vector>

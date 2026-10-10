@@ -71,6 +71,10 @@ class YouTubeAdService : AccessibilityService() {
     }
 
     private fun scanAndHandleAds(rootNode: AccessibilityNodeInfo) {
+        if (PaymentModeTileService.isPaymentModeActive(this)) {
+            return
+        }
+
         val skipped = checkAndClickSkipAd(rootNode)
         if (skipped) {
             if (isAdMuted) {
