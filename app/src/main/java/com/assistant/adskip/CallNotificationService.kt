@@ -52,9 +52,13 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == action ||
                 BluetoothDevice.ACTION_ACL_DISCONNECTED == action) {
                 Log.d(TAG, "Earphones disconnected!")
-                pauseMedia()
+                if (FeatureManager.isEnabled(this@CallNotificationService, FeatureManager.KEY_EARPHONE_AUTO_PAUSE)) {
+                    pauseMedia()
+                }
                 // Anti-Theft Alarm if phone was locked
-                sensorSafetyManager.triggerAntiTheftAlarmIfLocked()
+                if (FeatureManager.isEnabled(this@CallNotificationService, FeatureManager.KEY_ANTI_THEFT_ALARM)) {
+                    sensorSafetyManager.triggerAntiTheftAlarmIfLocked()
+                }
             }
         }
     }
@@ -139,13 +143,18 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
             if (title.matches(Regex("^[+0-9\\s-]+$"))) {
                 activeCallerNumber = title.replace(" ", "")
             }
-            handleIncomingCall(packageName, title, text)
+            if (FeatureManager.isEnabled(this, FeatureManager.KEY_CALL_ANNOUNCER) ||
+                FeatureManager.isEnabled(this, FeatureManager.KEY_CALL_VOICE_CONTROL)) {
+                handleIncomingCall(packageName, title, text)
+            }
             return
         }
 
         // 3. WhatsApp Message Reading Aloud
         if (packageName.contains("whatsapp") && isBluetoothConnected() && title.isNotBlank() && text.isNotBlank()) {
-            handleWhatsAppMessage(notification, title, text)
+            if (FeatureManager.isEnabled(this, FeatureManager.KEY_WA_READ_REPLY)) {
+                handleWhatsAppMessage(notification, title, text)
+            }
         }
     }
 
@@ -194,29 +203,38 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
     private fun handleIncomingCall(packageName: String, callerTitle: String, callerText: String) {
         if (!isBluetoothConnected()) return
 
-        val appName = when {
-            packageName.contains("whatsapp") -> "WhatsApp"
-            packageName.contains("instagram") -> "Instagram"
-            packageName.contains("telegram") -> "Telegram"
-            else -> "Phone"
+        val announcerEnabled = FeatureManager.isEnabled(this, FeatureManager.KEY_CALL_ANNOUNCER)
+        val voiceControlEnabled = FeatureManager.isEnabled(this, FeatureManager.KEY_CALL_VOICE_CONTROL)
+
+        if (announcerEnabled) {
+            val appName = when {
+                packageName.contains("whatsapp") -> "WhatsApp"
+                packageName.contains("instagram") -> "Instagram"
+                packageName.contains("telegram") -> "Telegram"
+                else -> "Phone"
+            }
+
+            val callerIdentity = if (callerTitle.isNotBlank()) callerTitle else callerText
+            val naturalCaller = formatCallerForSpeech(callerIdentity)
+
+            val announcement = if (callerIdentity.any { it.isLetter() }) {
+                "$appName call from $naturalCaller"
+            } else {
+                "Incoming call from $naturalCaller"
+            }
+
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f) // Comfortable earphone volume
+            }
+            textToSpeech?.speak(announcement, TextToSpeech.QUEUE_FLUSH, params, "CALL_ANNOUNCE")
         }
 
-        val callerIdentity = if (callerTitle.isNotBlank()) callerTitle else callerText
-        val naturalCaller = formatCallerForSpeech(callerIdentity)
-
-        val announcement = if (callerIdentity.any { it.isLetter() }) {
-            "$appName call from $naturalCaller"
-        } else {
-            "Incoming call from $naturalCaller"
+        if (voiceControlEnabled) {
+            val delay = if (announcerEnabled) 3000L else 500L
+            mainHandler.postDelayed({
+                startVoiceListeningForCall()
+            }, delay)
         }
-
-        val params = Bundle().apply {
-            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f) // Comfortable earphone volume
-        }
-        textToSpeech?.speak(announcement, TextToSpeech.QUEUE_FLUSH, params, "CALL_ANNOUNCE")
-        mainHandler.postDelayed({
-            startVoiceListeningForCall()
-        }, 3000)
     }
 
     private fun startVoiceListeningForCall() {
@@ -244,18 +262,21 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         }
 
         // 2. Read Summary (English + Hindi: summary, समरी, message padho, मैसेज पढ़ो)
-        if (commands.any { it.contains("summary") || it.contains("समरी") || it.contains("message") || it.contains("मैसेज") }) {
+        if (FeatureManager.isEnabled(this, FeatureManager.KEY_VOICE_NOTES) &&
+            commands.any { it.contains("summary") || it.contains("समरी") || it.contains("message") || it.contains("मैसेज") }) {
             readNotificationSummary()
             return
         }
 
         // 3. Voice Note (English + Hindi: note, likho, नोट, लिखो)
-        for (cmd in commands) {
-            val prefixes = listOf("note ", "likho ", "नोट ", "लिखो ")
-            val matched = prefixes.firstOrNull { cmd.startsWith(it) }
-            if (matched != null) {
-                saveVoiceNote(cmd.substringAfter(matched).trim())
-                return
+        if (FeatureManager.isEnabled(this, FeatureManager.KEY_VOICE_NOTES)) {
+            for (cmd in commands) {
+                val prefixes = listOf("note ", "likho ", "नोट ", "लिखो ")
+                val matched = prefixes.firstOrNull { cmd.startsWith(it) }
+                if (matched != null) {
+                    saveVoiceNote(cmd.substringAfter(matched).trim())
+                    return
+                }
             }
         }
     }
@@ -315,10 +336,12 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
                 declineCall(actions)
             }
             isScreen -> {
-                textToSpeech?.speak(
-                    "नमस्ते, पवन अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
-                    TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL_HI"
-                )
+                if (FeatureManager.isEnabled(this, FeatureManager.KEY_AI_SECRETARY)) {
+                    textToSpeech?.speak(
+                        "नमस्ते, पवन अभी व्यस्त हैं। कृपया अपना नाम और काम बताएँ।",
+                        TextToSpeech.QUEUE_FLUSH, null, "SCREEN_CALL_HI"
+                    )
+                }
             }
         }
     }
@@ -389,8 +412,10 @@ class CallNotificationService : NotificationListenerService(), TextToSpeech.OnIn
         }
 
         // 3. Auto-SMS on Decline
-        activeCallerNumber?.let { number ->
-            sendAutoSms(number)
+        if (FeatureManager.isEnabled(this, FeatureManager.KEY_AI_SECRETARY)) {
+            activeCallerNumber?.let { number ->
+                sendAutoSms(number)
+            }
         }
         resumeYouTubePlayback()
     }

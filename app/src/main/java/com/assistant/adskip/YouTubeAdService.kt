@@ -75,7 +75,10 @@ class YouTubeAdService : AccessibilityService() {
             return
         }
 
-        val skipped = checkAndClickSkipAd(rootNode)
+        val autoSkipEnabled = FeatureManager.isEnabled(this, FeatureManager.KEY_YT_AUTO_SKIP)
+        val adMuteEnabled = FeatureManager.isEnabled(this, FeatureManager.KEY_YT_AD_MUTE)
+
+        val skipped = if (autoSkipEnabled) checkAndClickSkipAd(rootNode) else false
         if (skipped) {
             if (isAdMuted) {
                 unmuteMedia()
@@ -83,10 +86,14 @@ class YouTubeAdService : AccessibilityService() {
             return
         }
 
-        val isVideoAdPlaying = isVideoAdInPlayer(rootNode)
-        if (isVideoAdPlaying) {
-            if (!isAdMuted) {
-                muteMedia()
+        if (adMuteEnabled) {
+            val isVideoAdPlaying = isVideoAdInPlayer(rootNode)
+            if (isVideoAdPlaying) {
+                if (!isAdMuted) {
+                    muteMedia()
+                }
+            } else if (isAdMuted) {
+                unmuteMedia()
             }
         } else if (isAdMuted) {
             unmuteMedia()
@@ -167,7 +174,7 @@ class YouTubeAdService : AccessibilityService() {
      * and auto-swipes to the next video when video reaches completion.
      */
     private fun checkAndAutoScrollShorts(rootNode: AccessibilityNodeInfo) {
-        if (!isAutoScrollEnabled) return
+        if (!FeatureManager.isEnabled(this, FeatureManager.KEY_SHORTS_SCROLL)) return
 
         val packageName = rootNode.packageName?.toString() ?: ""
         val isShorts = packageName.contains("youtube") &&
@@ -210,6 +217,7 @@ class YouTubeAdService : AccessibilityService() {
      * Clicks the 3 dots menu and taps "Don't recommend channel".
      */
     fun skipChannel() {
+        if (!FeatureManager.isEnabled(this, FeatureManager.KEY_SKIP_CHANNEL)) return
         val rootNode = rootInActiveWindow ?: return
         val menuNodes = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/menu_button")
         if (menuNodes.isNotEmpty() && menuNodes[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)) {

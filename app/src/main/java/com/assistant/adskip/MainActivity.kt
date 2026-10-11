@@ -5,19 +5,31 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class MainActivity : AppCompatActivity() {
 
     private val PERMISSION_REQUEST_CODE = 101
+    private lateinit var tvActiveCount: TextView
+    private lateinit var rvFeatures: RecyclerView
+    private lateinit var featureAdapter: FeatureAdapter
+    private val featureList = FeatureManager.getAllFeatures()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        tvActiveCount = findViewById(R.id.tvActiveCount)
+        rvFeatures = findViewById(R.id.rvFeatures)
 
         val btnAccessibility = findViewById<Button>(R.id.btnAccessibility)
         val btnNotification = findViewById<Button>(R.id.btnNotification)
@@ -39,7 +51,67 @@ class MainActivity : AppCompatActivity() {
             checkAndRequestPermissions()
         }
 
+        setupRecyclerView()
+        updateActiveCount()
         checkAndRequestPermissions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateActiveCount()
+    }
+
+    private fun setupRecyclerView() {
+        featureAdapter = FeatureAdapter(
+            features = featureList,
+            onToggleChanged = { _, _ ->
+                updateActiveCount()
+            },
+            onInfoClicked = { feature ->
+                showFeatureDetailsDialog(feature)
+            }
+        )
+        rvFeatures.layoutManager = LinearLayoutManager(this)
+        rvFeatures.adapter = featureAdapter
+    }
+
+    private fun updateActiveCount() {
+        val activeCount = featureList.count {
+            FeatureManager.isEnabled(this, it.id, it.defaultEnabled)
+        }
+        tvActiveCount.text = "$activeCount of ${featureList.size} features active • 100% Offline"
+    }
+
+    private fun showFeatureDetailsDialog(feature: FeatureItem) {
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_feature_details, null)
+
+        val tvCategory = view.findViewById<TextView>(R.id.tvDetailCategory)
+        val tvTitle = view.findViewById<TextView>(R.id.tvDetailTitle)
+        val tvDescription = view.findViewById<TextView>(R.id.tvDetailDescription)
+        val tvTrigger = view.findViewById<TextView>(R.id.tvDetailTrigger)
+        val layoutVoiceCommands = view.findViewById<View>(R.id.layoutVoiceCommands)
+        val tvVoiceCommands = view.findViewById<TextView>(R.id.tvDetailVoiceCommands)
+        val btnClose = view.findViewById<Button>(R.id.btnDetailClose)
+
+        tvCategory.text = feature.category
+        tvTitle.text = feature.title
+        tvDescription.text = feature.description
+        tvTrigger.text = feature.triggerInfo
+
+        if (feature.voiceCommands.isNotEmpty()) {
+            layoutVoiceCommands.visibility = View.VISIBLE
+            tvVoiceCommands.text = feature.voiceCommands.joinToString("\n") { "• $it" }
+        } else {
+            layoutVoiceCommands.visibility = View.GONE
+        }
+
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.setContentView(view)
+        dialog.show()
     }
 
     private fun checkAndRequestPermissions() {

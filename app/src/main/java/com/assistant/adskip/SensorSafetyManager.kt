@@ -54,14 +54,17 @@ class SensorSafetyManager(
                 val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                                  status == BatteryManager.BATTERY_STATUS_FULL
 
-                if (percentage == 100 && isCharging && lastAnnouncedBattery != 100) {
-                    lastAnnouncedBattery = 100
-                    tts?.speak("Battery fully charged, please unplug charger.", TextToSpeech.QUEUE_ADD, null, "BATTERY_FULL")
-                } else if (percentage == 15 && !isCharging && lastAnnouncedBattery != 15) {
-                    lastAnnouncedBattery = 15
-                    tts?.speak("Battery low: 15% remaining.", TextToSpeech.QUEUE_ADD, null, "BATTERY_LOW")
-                } else if (percentage in 16..99) {
-                    lastAnnouncedBattery = percentage
+                val isBatteryAlertEnabled = FeatureManager.isEnabled(context ?: return, FeatureManager.KEY_BATTERY_ALERTS)
+                if (isBatteryAlertEnabled) {
+                    if (percentage == 100 && isCharging && lastAnnouncedBattery != 100) {
+                        lastAnnouncedBattery = 100
+                        tts?.speak("Battery fully charged, please unplug charger.", TextToSpeech.QUEUE_ADD, null, "BATTERY_FULL")
+                    } else if (percentage == 15 && !isCharging && lastAnnouncedBattery != 15) {
+                        lastAnnouncedBattery = 15
+                        tts?.speak("Battery low: 15% remaining.", TextToSpeech.QUEUE_ADD, null, "BATTERY_LOW")
+                    } else if (percentage in 16..99) {
+                        lastAnnouncedBattery = percentage
+                    }
                 }
             }
         }
@@ -101,9 +104,11 @@ class SensorSafetyManager(
 
         // Flip-to-Mute (When ringing and flipped face-down on table: Z < -7 m/s²)
         if (isPhoneRinging && z < -7.0f) {
-            Log.d(TAG, "Phone flipped face down! Muting ringer.")
-            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
-            audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
+            if (FeatureManager.isEnabled(context, FeatureManager.KEY_FLIP_TO_MUTE)) {
+                Log.d(TAG, "Phone flipped face down! Muting ringer.")
+                audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
+            }
             isPhoneRinging = false
         }
     }
