@@ -19,6 +19,7 @@ object FeatureManager {
 
     private const val PREFS_NAME = "SmartAssistantFeatures"
 
+    const val KEY_MASTER_ASSISTANT_ENABLED = "feat_master_assistant_enabled"
     const val KEY_YT_AUTO_SKIP = "feat_yt_auto_skip"
     const val KEY_YT_AD_MUTE = "feat_yt_ad_mute"
     const val KEY_SHORTS_SCROLL = "feat_shorts_scroll"
@@ -38,7 +39,16 @@ object FeatureManager {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
+    fun isMasterEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_MASTER_ASSISTANT_ENABLED, true)
+    }
+
+    fun setMasterEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_MASTER_ASSISTANT_ENABLED, enabled).apply()
+    }
+
     fun isEnabled(context: Context, featureId: String, defaultValue: Boolean = true): Boolean {
+        if (!isMasterEnabled(context)) return false
         return getPrefs(context).getBoolean(featureId, defaultValue)
     }
 

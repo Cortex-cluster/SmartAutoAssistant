@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -64,6 +65,15 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Notification Quick Toggle Bar Receiver -->
+        <receiver
+            android:name=".AssistantNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.assistant.adskip.ACTION_TOGGLE_MASTER" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

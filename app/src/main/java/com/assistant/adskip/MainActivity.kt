@@ -53,11 +53,13 @@ class MainActivity : AppCompatActivity() {
 
         setupRecyclerView()
         updateActiveCount()
+        AssistantNotificationReceiver.showOrUpdateControlNotification(this)
     }
 
     override fun onResume() {
         super.onResume()
         updateActiveCount()
+        AssistantNotificationReceiver.showOrUpdateControlNotification(this)
     }
 
     private fun setupRecyclerView() {
@@ -65,6 +67,7 @@ class MainActivity : AppCompatActivity() {
             features = featureList,
             onToggleChanged = { _, _ ->
                 updateActiveCount()
+                AssistantNotificationReceiver.showOrUpdateControlNotification(this)
             },
             onInfoClicked = { feature ->
                 showFeatureDetailsDialog(feature)
@@ -75,6 +78,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveCount() {
+        val isMasterOn = FeatureManager.isMasterEnabled(this)
+        if (!isMasterOn) {
+            tvActiveCount.text = "Assistant is PAUSED from notification bar"
+            return
+        }
         val activeCount = featureList.count {
             FeatureManager.isEnabled(this, it.id, it.defaultEnabled)
         }
@@ -127,6 +135,9 @@ class MainActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             permissionList.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissionList.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         val missingPermissions = permissionList.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -134,6 +145,8 @@ class MainActivity : AppCompatActivity() {
 
         if (missingPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
+        } else {
+            Toast.makeText(this, "All runtime permissions already granted!", Toast.LENGTH_SHORT).show()
         }
     }
 }

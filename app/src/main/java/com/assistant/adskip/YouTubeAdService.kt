@@ -171,23 +171,67 @@ class YouTubeAdService : AccessibilityService() {
     /**
      * Hands-Free Shorts / Reels Auto-Scroller:
      * Detects when in YouTube Shorts or Instagram Reels player,
-     * and auto-swipes to the next video when video reaches completion.
+     * and auto-swipes to the next video hands-free.
      */
     private fun checkAndAutoScrollShorts(rootNode: AccessibilityNodeInfo) {
         if (!FeatureManager.isEnabled(this, FeatureManager.KEY_SHORTS_SCROLL)) return
 
-        val packageName = rootNode.packageName?.toString() ?: ""
-        val isShorts = packageName.contains("youtube") &&
-                (rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_player_page_tree").isNotEmpty() ||
-                 rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/shorts_container").isNotEmpty())
+        val packageName = rootNode.packageName?.toString()?.lowercase() ?: ""
 
-        val isReels = packageName.contains("instagram") &&
-                rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/reel_viewer_container").isNotEmpty()
+        val isYouTube = packageName.contains("youtube")
+        val isInstagram = packageName.contains("instagram")
 
-        if (isShorts || isReels) {
+        if (!isYouTube && !isInstagram) return
+
+        var isShortsOrReelsActive = false
+
+        if (isYouTube) {
+            val shortsIds = listOf(
+                "com.google.android.youtube:id/reel_player_page_tree",
+                "com.google.android.youtube:id/shorts_container",
+                "com.google.android.youtube:id/reel_recycler",
+                "com.google.android.youtube:id/reel_watch_fragment_root"
+            )
+            for (id in shortsIds) {
+                if (rootNode.findAccessibilityNodeInfosByViewId(id).isNotEmpty()) {
+                    isShortsOrReelsActive = true
+                    break
+                }
+            }
+            if (!isShortsOrReelsActive) {
+                // Secondary check: YouTube shorts action bar buttons
+                val remixButton = rootNode.findAccessibilityNodeInfosByText("Remix")
+                val soundButton = rootNode.findAccessibilityNodeInfosByText("Use this sound")
+                if (remixButton.isNotEmpty() || soundButton.isNotEmpty()) {
+                    isShortsOrReelsActive = true
+                }
+            }
+        } else if (isInstagram) {
+            val reelIds = listOf(
+                "com.instagram.android:id/reel_viewer_container",
+                "com.instagram.android:id/clips_video_container",
+                "com.instagram.android:id/clips_viewer_view_pager",
+                "com.instagram.android:id/viewer_media_view_root"
+            )
+            for (id in reelIds) {
+                if (rootNode.findAccessibilityNodeInfosByViewId(id).isNotEmpty()) {
+                    isShortsOrReelsActive = true
+                    break
+                }
+            }
+            if (!isShortsOrReelsActive) {
+                val audioTrack = rootNode.findAccessibilityNodeInfosByText("Audio")
+                val reelsLabel = rootNode.findAccessibilityNodeInfosByText("Reels")
+                if (audioTrack.isNotEmpty() || reelsLabel.isNotEmpty()) {
+                    isShortsOrReelsActive = true
+                }
+            }
+        }
+
+        if (isShortsOrReelsActive) {
             val now = System.currentTimeMillis()
-            // Auto-scroll interval: allows full short viewing then scrolls hands-free (every 25 seconds)
-            if (now - lastScrollTime > 25000) {
+            // Auto-scroll interval: 15 seconds allows viewing video then auto-advances hands-free
+            if (now - lastScrollTime > 15000L) {
                 lastScrollTime = now
                 swipeUpNextVideo()
             }
@@ -196,20 +240,32 @@ class YouTubeAdService : AccessibilityService() {
 
     private fun swipeUpNextVideo() {
         val displayMetrics = resources.displayMetrics
-        val centerX = (displayMetrics.widthPixels / 2).toFloat()
-        val startY = (displayMetrics.heightPixels * 0.8f)
-        val endY = (displayMetrics.heightPixels * 0.2f)
+        val width = displayMetrics.widthPixels
+        val height = displayMetrics.heightPixels
+
+        // Center X with safe vertical swipe distance (from 75% down to 25% up)
+        val centerX = (width / 2).toFloat()
+        val startY = height * 0.75f
+        val endY = height * 0.25f
 
         val path = Path().apply {
             moveTo(centerX, startY)
             lineTo(centerX, endY)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 300))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 250))
             .build()
 
-        dispatchGesture(gesture, null, null)
-        Log.d(TAG, "Auto-scrolled to next Short/Reel.")
+        dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                Log.d(TAG, "Auto-scroll swipe gesture completed successfully.")
+            }
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                Log.w(TAG, "Auto-scroll swipe gesture cancelled by OS.")
+            }
+        }, null)
     }
 
     /**
