@@ -82,11 +82,11 @@ object FeatureManager {
             ),
             FeatureItem(
                 id = KEY_SHORTS_SCROLL,
-                title = "Shorts & Reels Auto-Scroller",
-                summary = "Hands-free auto-swipe every 25s for Shorts and Reels",
+                title = "Shorts & Reels Smart Auto-Scroller",
+                summary = "Auto-scrolls on video completion & skips sponsored ads instantly",
                 category = "YouTube & Media",
-                description = "Allows true hands-free entertainment while cooking, working out, or eating. Automatically executes a smooth vertical gesture to scroll to the next Short (YouTube) or Reel (Instagram) every 25 seconds.",
-                triggerInfo = "Trigger: When watching YouTube Shorts or Instagram Reels.\nPermission: Accessibility Service (Gesture Dispatch).",
+                description = "Monitors YouTube Shorts and Instagram Reels progress bar and loop indicators. Automatically advances to the next video the moment playback finishes (or upon video loop reset). Instantly swipes away sponsored / promoted reels and shorts without delay.",
+                triggerInfo = "Trigger: Active in YouTube Shorts & Instagram Reels.\nPermission: Accessibility Service (Gesture Dispatch).",
                 voiceCommands = emptyList(),
                 requiredPermission = "Accessibility Service",
                 defaultEnabled = true

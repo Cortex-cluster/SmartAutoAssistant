@@ -22,6 +22,10 @@ class YouTubeAdService : AccessibilityService() {
     // Auto-scroller for Shorts & Reels
     private var isAutoScrollEnabled = true
     private var lastScrollTime = 0L
+    private var lastVideoProgress: Float = -1f
+    private var lastObservedVideoId: String = ""
+    private var videoStartTime = 0L
+    private var isSwiping = false
 
     companion object {
         const val TAG = "YouTubeAdService"
@@ -170,18 +174,23 @@ class YouTubeAdService : AccessibilityService() {
 
     /**
      * Hands-Free Shorts / Reels Auto-Scroller:
-     * Detects when in YouTube Shorts or Instagram Reels player,
-     * and auto-swipes to the next video hands-free.
+     * 1. Detects sponsored / promoted Shorts & Reels and immediately scrolls away without waiting.
+     * 2. Detects video completion: watches progressBar / seekbar progress, loop indicators, or natural end,
+     *    and auto-swipes the instant the video finishes.
      */
     private fun checkAndAutoScrollShorts(rootNode: AccessibilityNodeInfo) {
         if (!FeatureManager.isEnabled(this, FeatureManager.KEY_SHORTS_SCROLL)) return
+        if (isSwiping) return
 
         val packageName = rootNode.packageName?.toString()?.lowercase() ?: ""
-
         val isYouTube = packageName.contains("youtube")
         val isInstagram = packageName.contains("instagram")
 
-        if (!isYouTube && !isInstagram) return
+        if (!isYouTube && !isInstagram) {
+            lastVideoProgress = -1f
+            lastObservedVideoId = ""
+            return
+        }
 
         var isShortsOrReelsActive = false
 
@@ -199,7 +208,6 @@ class YouTubeAdService : AccessibilityService() {
                 }
             }
             if (!isShortsOrReelsActive) {
-                // Secondary check: YouTube shorts action bar buttons
                 val remixButton = rootNode.findAccessibilityNodeInfosByText("Remix")
                 val soundButton = rootNode.findAccessibilityNodeInfosByText("Use this sound")
                 if (remixButton.isNotEmpty() || soundButton.isNotEmpty()) {
@@ -228,42 +236,197 @@ class YouTubeAdService : AccessibilityService() {
             }
         }
 
-        if (isShortsOrReelsActive) {
-            val now = System.currentTimeMillis()
-            // Auto-scroll interval: 15 seconds allows viewing video then auto-advances hands-free
-            if (now - lastScrollTime > 15000L) {
+        if (!isShortsOrReelsActive) return
+
+        val now = System.currentTimeMillis()
+
+        // 1. INSTANT SPONSORED / AD REEL DETECTION
+        if (isSponsoredShortOrReel(rootNode, isYouTube, isInstagram)) {
+            if (now - lastScrollTime > 1200L) { // Prevent ultra-fast repeat loop
+                Log.d(TAG, "Sponsored Short/Reel detected! Scrolling away immediately.")
                 lastScrollTime = now
+                resetVideoTracking()
                 swipeUpNextVideo()
+                return
             }
+        }
+
+        // Generate a fingerprint for the current video to reset timers when a new video appears
+        val currentVideoId = extractVideoIdentifier(rootNode)
+        if (currentVideoId.isNotBlank() && currentVideoId != lastObservedVideoId) {
+            lastObservedVideoId = currentVideoId
+            videoStartTime = now
+            lastVideoProgress = -1f
+            Log.d(TAG, "New video started: $currentVideoId")
+        } else if (videoStartTime == 0L) {
+            videoStartTime = now
+        }
+
+        // 2. DETECT VIDEO COMPLETION VIA PROGRESS BAR / SEEKBAR
+        val currentProgress = extractVideoProgress(rootNode)
+        var isCompleted = false
+
+        if (currentProgress != null) {
+            // Check if progress reached the end (>97%)
+            if (currentProgress >= 0.97f) {
+                isCompleted = true
+                Log.d(TAG, "Video progress completed: ${currentProgress * 100}%")
+            }
+            // Or check if video looped back to start (e.g. was >0.85 and now reset to <0.15)
+            else if (lastVideoProgress > 0.80f && currentProgress < 0.18f) {
+                isCompleted = true
+                Log.d(TAG, "Video looped back to start! (previous: $lastVideoProgress, now: $currentProgress)")
+            }
+            lastVideoProgress = currentProgress
+        }
+
+        // 3. FALLBACK SAFETY TIMEOUT (Avoid getting stuck on videos without accessible progress bars)
+        val timeOnCurrentVideo = now - videoStartTime
+        if (!isCompleted && timeOnCurrentVideo > 55000L) {
+            // Standard Shorts/Reels max length is ~60s
+            isCompleted = true
+            Log.d(TAG, "Safety max playback duration reached ($timeOnCurrentVideo ms). Auto-scrolling.")
+        }
+
+        if (isCompleted && (now - lastScrollTime > 2500L)) {
+            lastScrollTime = now
+            resetVideoTracking()
+            swipeUpNextVideo()
         }
     }
 
+    private fun resetVideoTracking() {
+        lastVideoProgress = -1f
+        videoStartTime = System.currentTimeMillis()
+    }
+
+    private fun extractVideoIdentifier(rootNode: AccessibilityNodeInfo): String {
+        // Find title, channel name, or creator username node to fingerprint the current reel
+        val possibleNodes = listOf(
+            "com.google.android.youtube:id/reel_player_title",
+            "com.google.android.youtube:id/channel_name",
+            "com.instagram.android:id/row_feed_photo_profile_name",
+            "com.instagram.android:id/video_subtitle"
+        )
+        for (id in possibleNodes) {
+            val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
+            if (nodes.isNotEmpty()) {
+                val text = nodes[0].text?.toString()?.trim() ?: ""
+                if (text.isNotBlank()) return text
+            }
+        }
+        return ""
+    }
+
+    private fun isSponsoredShortOrReel(rootNode: AccessibilityNodeInfo, isYouTube: Boolean, isInstagram: Boolean): Boolean {
+        if (isYouTube) {
+            // YouTube Shorts Sponsored tags
+            val adBadges = rootNode.findAccessibilityNodeInfosByText("Sponsored")
+            if (adBadges.isNotEmpty()) return true
+
+            val adTag = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/ad_badge")
+            if (adTag.isNotEmpty()) return true
+
+            val shopNodes = rootNode.findAccessibilityNodeInfosByText("Shop now")
+            if (shopNodes.isNotEmpty()) return true
+
+            val installNodes = rootNode.findAccessibilityNodeInfosByText("Install now")
+            if (installNodes.isNotEmpty()) return true
+        }
+
+        if (isInstagram) {
+            // Instagram Reels Sponsored tags
+            val sponsoredNodes = rootNode.findAccessibilityNodeInfosByText("Sponsored")
+            if (sponsoredNodes.isNotEmpty()) return true
+
+            val paidPartnership = rootNode.findAccessibilityNodeInfosByText("Paid partnership")
+            if (paidPartnership.isNotEmpty()) return true
+
+            val adActionIds = listOf(
+                "com.instagram.android:id/cta_button",
+                "com.instagram.android:id/ad_action_button"
+            )
+            for (id in adActionIds) {
+                if (rootNode.findAccessibilityNodeInfosByViewId(id).isNotEmpty()) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private fun extractVideoProgress(rootNode: AccessibilityNodeInfo): Float? {
+        val progressBarIds = listOf(
+            "com.google.android.youtube:id/reel_player_progress_bar",
+            "com.google.android.youtube:id/progress_bar",
+            "com.instagram.android:id/reel_viewer_progress_bar",
+            "com.instagram.android:id/video_progress"
+        )
+
+        for (id in progressBarIds) {
+            val nodes = rootNode.findAccessibilityNodeInfosByViewId(id)
+            for (node in nodes) {
+                val rangeInfo = node.rangeInfo
+                if (rangeInfo != null && rangeInfo.max > 0f) {
+                    val progress = rangeInfo.current / rangeInfo.max
+                    return progress.coerceIn(0f, 1f)
+                }
+            }
+        }
+
+        // Search recursively for any RangeInfo of type RANGE_TYPE_FLOAT or PROGRESS
+        return findProgressRecursive(rootNode)
+    }
+
+    private fun findProgressRecursive(node: AccessibilityNodeInfo?): Float? {
+        if (node == null) return null
+
+        val range = node.rangeInfo
+        if (range != null && range.max > 0f) {
+            val ratio = range.current / range.max
+            return ratio.coerceIn(0f, 1f)
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            val p = findProgressRecursive(child)
+            if (p != null) return p
+        }
+        return null
+    }
+
     private fun swipeUpNextVideo() {
+        if (isSwiping) return
+        isSwiping = true
+
         val displayMetrics = resources.displayMetrics
         val width = displayMetrics.widthPixels
         val height = displayMetrics.heightPixels
 
-        // Center X with safe vertical swipe distance (from 75% down to 25% up)
+        // Center X with safe vertical swipe distance (from 78% down to 22% up)
         val centerX = (width / 2).toFloat()
-        val startY = height * 0.75f
-        val endY = height * 0.25f
+        val startY = height * 0.78f
+        val endY = height * 0.22f
 
         val path = Path().apply {
             moveTo(centerX, startY)
             lineTo(centerX, endY)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 250))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 240))
             .build()
 
         dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                Log.d(TAG, "Auto-scroll swipe gesture completed successfully.")
+                isSwiping = false
+                Log.d(TAG, "Auto-scroll swipe completed successfully.")
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                Log.w(TAG, "Auto-scroll swipe gesture cancelled by OS.")
+                isSwiping = false
+                Log.w(TAG, "Auto-scroll swipe cancelled by OS.")
             }
         }, null)
     }
