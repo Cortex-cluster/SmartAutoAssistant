@@ -69,12 +69,10 @@
                 android:focusable="true"
                 android:layout_marginEnd="6dp" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
+            <androidx.appcompat.widget.SwitchCompat
                 android:id="@+id/switchFeature"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:thumbTint="@color/accent_green"
-                app:trackTint="@color/bg_card_stroke" />
+                android:layout_height="wrap_content" />
 
         </LinearLayout>
 

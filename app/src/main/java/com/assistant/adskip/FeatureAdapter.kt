@@ -5,8 +5,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.widget.SwitchCompat
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.materialswitch.MaterialSwitch
 
 class FeatureAdapter(
     private val features: List<FeatureItem>,
@@ -18,7 +18,7 @@ class FeatureAdapter(
         val tvCategory: TextView = itemView.findViewById(R.id.tvFeatureCategory)
         val tvTitle: TextView = itemView.findViewById(R.id.tvFeatureTitle)
         val tvSummary: TextView = itemView.findViewById(R.id.tvFeatureSummary)
-        val switchFeature: MaterialSwitch = itemView.findViewById(R.id.switchFeature)
+        val switchFeature: SwitchCompat = itemView.findViewById(R.id.switchFeature)
         val btnInfo: ImageView = itemView.findViewById(R.id.btnFeatureInfo)
 
         fun bind(item: FeatureItem) {

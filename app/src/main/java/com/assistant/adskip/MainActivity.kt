@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
 
         setupRecyclerView()
         updateActiveCount()
-        checkAndRequestPermissions()
     }
 
     override fun onResume() {
